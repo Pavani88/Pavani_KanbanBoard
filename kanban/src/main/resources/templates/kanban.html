@@ -1,0 +1,262 @@
+    <!DOCTYPE html>
+<html>
+<head>
+<meta charset="ISO-8859-1">
+<meta name="_csrf_header" content="${_csrf.headerName}"/>
+<title>Insert title here</title>
+<link rel = "stylesheet" href="./style.css">
+
+</head>
+<body>
+    <div class="container">
+        <div class="divControls">
+            <h1>Controls</h1>
+            <div class="divTaskForm">
+                <div class="row">
+                    <span><input type="text" id="newTaskName" class="" placeholder="new task" /></span>
+                    <span><button id="btnCreate" >Create</button></span>
+                </div>
+                <div class="row">
+                	<input type="hidden" id="hdnTaskId" />
+                	<input type="hidden" id="hdnTaskStatus" />
+                    <span><input type="text" id="existingTaskName" class="" placeholder="Click on existing task" disabled /></span>
+                    <span><button id="btnMoveBack">Move Back</button></span>
+                    <span><button id="btnMoveForward">Move Forward</button></span>
+                    <span><button id="btnDelete">Delete</button></span>
+                </div>
+            </div>
+        </div>
+        <div class="divKanbanBoard">
+            <h1>Kanban Board</h1>
+            <div class="divMain">
+                <div class="divChild" id="divBacklog">
+                    <h2>Backlog</h2>
+                </div>
+                <div class="divChild" id="divToDo">
+                    <h2>To Do</h2>
+                </div>
+                <div class="divChild" id="divOngoing">
+                    <h2>Ongoing</h2>
+                </div>
+                <div class="divChild" id="divDone">
+                    <h2>Done</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+<script
+  src="https://code.jquery.com/jquery-3.5.1.js"
+  integrity="sha256-QWo7LDvxbWT2tbbQ97B53yJnYU3WhH/C8ycbRAkjPDc="
+  crossorigin="anonymous">
+</script>
+</body>
+<script>
+var taskList = [];
+var id_btnCreate = '#btnCreate';
+var id_btnMoveBack = '#btnMoveBack';
+var id_btnMoveForward = '#btnMoveForward';
+var id_btnDelete = '#btnDelete';
+var id_hdnTaskId = '#hdnTaskId';
+var id_hdnTaskStatus = '#hdnTaskStatus';
+var id_newTaskName = '#newTaskName';
+var id_existingTaskName = '#existingTaskName';
+var id_divBacklog = '#divBacklog';
+var id_divToDo = '#divToDo';
+var id_divOngoing = '#divOngoing';
+var id_divDone = '#divDone';
+var cls_divMain = '.divMain';
+var cls_taskClass = '.taskClass';
+
+$(document).ready(function()
+{
+	// to load the tasks on page load
+	$.ajax({
+	   url: "/task",
+	   data: null,
+	   type: "GET",	
+	   contentType: "application/json",
+	   success: function (response) {
+		   LoadTasks(response);
+	   },
+	   error: function (e) {
+		   
+	   }
+	});
+
+	// to create a new task
+	$(id_btnCreate).click(function() {
+		var task = new Object();
+		task.taskName = $(id_newTaskName).val();
+		task.status = 1;
+		
+		$.ajax({
+		   url: "/create",
+		   data: JSON.stringify(task),
+		   type: "POST",	
+		   contentType: "application/json",
+		   success: function (response) {
+			   LoadTasks(response)
+		   },
+		   error: function (e) {
+			   
+		   }
+		});	
+	});
+
+	// to move forward the selected task
+	$(id_btnMoveForward).click(function () {
+    	$(id_btnMoveBack).attr('disabled', false);
+		var taskStatus = parseInt($(id_hdnTaskStatus).val())+1;
+		$(id_hdnTaskStatus).val(taskStatus);
+		
+		var task = new Object();
+		task.id = $(id_hdnTaskId).val();
+		task.taskName = $(id_existingTaskName).val();
+		task.status = taskStatus;
+
+        if (task.status == 4) {
+        	$(id_btnMoveForward).attr('disabled', true);
+        }
+		
+		$.ajax({
+		   url: "/update",
+		   data: JSON.stringify(task),
+		   type: "POST",	
+		   contentType: "application/json",
+		   success: function (response) {
+			   LoadTasks(response)
+		   },
+		   error: function (e) {
+			   
+		   }
+		});
+	});
+
+	// to move back the selected task
+	$(id_btnMoveBack).click(function () {
+    	$(id_btnMoveForward).attr('disabled', false);
+		var taskStatus = parseInt($(id_hdnTaskStatus).val()) - 1;
+		$(id_hdnTaskStatus).val(taskStatus);
+		
+		var task = new Object();
+		task.id = $(id_hdnTaskId).val();
+		task.taskName = $(id_existingTaskName).val();
+		task.status = taskStatus;
+
+        if (task.status == 1) {
+        	$(id_btnMoveBack).attr('disabled', true);
+        }
+		
+		$.ajax({
+		   url: "/update",
+		   data: JSON.stringify(task),
+		   type: "POST",	
+		   contentType: "application/json",
+		   success: function (response) {
+			   LoadTasks(response)
+		   },
+		   error: function (e) {
+			   
+		   }
+		});
+	});
+	
+	// to delete the selected task
+	$(id_btnDelete).click(function () {
+    	var task = new Object();
+		task.id = $(id_hdnTaskId).val();
+		task.taskName = $(id_existingTaskName).val();
+		task.status = parseInt($(id_hdnTaskStatus).val());
+
+		$.ajax({
+		   url: "/delete",
+		   data: JSON.stringify(task),
+		   type: "POST",	
+		   contentType: "application/json",
+		   success: function (response) {
+			   LoadTasks(response)
+		   },
+		   error: function (e) {
+			   
+		   }
+		});
+	});
+	
+	// to load the tasks to board in order
+	function LoadTasks(results) {
+		$(cls_taskClass).remove();
+		if (results != null) {
+			// looping through each task to load to board
+			for (var i = 0; i < results.length; i++) {
+				
+				// reading each task
+				var result = results[i];
+				var task = "<div id="+result.id+" class='taskClass'>"+result.taskName+"</div>";
+				
+				if (result.status == 1) {
+					//Add to Backlog
+					$(id_divBacklog).append(task);
+				}
+				else if (result.status == 2) {
+					//Add to To Do
+					$(id_divToDo).append(task);
+				}
+				else if (result.status == 3) {
+					//Add to Ongoing
+					$(id_divOngoing).append(task);
+				}
+				else if (result.status == 4) {
+					//Add to Done
+					$(id_divDone).append(task);
+				}
+			}
+		}
+	}
+	
+	// highlighting the task on mouse over
+    $(cls_divMain).on({
+        mouseenter: function (){
+        $(this).addClass("activeTask");
+    }, mouseleave: function (){
+        $(this).removeClass("activeTask");
+    }
+    }, cls_taskClass);
+    
+    // on selecting any task in board
+    $(cls_divMain).on('click', cls_taskClass, function (){
+    	//enabling the Move button
+    	$(id_btnMoveBack).attr('disabled', false);
+    	$(id_btnMoveForward).attr('disabled', false);
+    	
+    	var task = $(this);
+    	
+    	// setting the selected task text to existing task name box
+    	$(id_existingTaskName).val(task.text());
+    	
+    	// setting the selected task id to hidden field
+    	$(id_hdnTaskId).val(task.attr('id'));
+    	
+    	// setting the selected task status to hidden field
+        if (task.parent().attr('id') == 'divBacklog') {
+        	$(id_btnMoveBack).attr('disabled', true);
+        	$(id_hdnTaskStatus).val(1);
+    	}
+    	
+        if (task.parent().attr('id') == 'divToDo') {
+        	$(id_hdnTaskStatus).val(2);
+        }
+
+        if (task.parent().attr('id') == 'divOngoing') {
+        	$(id_hdnTaskStatus).val(3);
+        }
+
+        if (task.parent().attr('id') == 'divDone') {
+        	$(id_btnMoveForward).attr('disabled', true);
+        	$(id_hdnTaskStatus).val(4);
+    	}
+    });
+
+});
+
+</script>
+</html>
